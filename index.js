@@ -45,6 +45,21 @@ async function run() {
   });
 
 
+  app.get('/allPost', async(req, res) => {
+    const cursor = postCollection.find();
+    const result = await cursor.toArray();
+    res.send(result);
+});
+
+  app.get("/allPost/:email", async (req, res) => {
+    const email = req.params.email;
+    const query = { email: email };
+    const cursor = postCollection.find(query);
+    const result = await cursor.toArray();
+    res.send(result);
+  });
+
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
