@@ -32,9 +32,19 @@ async function run() {
     const userCollection = client.db("assignment-12Db").collection('users');
     const postCollection = client.db("assignment-12Db").collection('post');
 
+    app.get('/user', async(req,res)=>{
+      const result = await userCollection.find().toArray();
+      res.send(result);
+
+    })
 
     app.post('/users', async(req,res)=>{
         const user = req.body;
+        const query = {email: user.email};
+        const existingUser = await userCollection.findOne(query);
+        if(existingUser){
+          return res.send({message: 'user already exists', insertedId: null})
+        }
         const result = await userCollection.insertOne(user);
         res.send(result)
     });
@@ -43,7 +53,20 @@ async function run() {
       const result = await postCollection.insertOne(newPost);
       res.send(result); 
   });
-
+  
+  app.put('/allPost/:id', async (req, res) => {
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id) };
+    const addComment = req.body;
+    const Update = {
+      $set: {
+        comment: addComment.comment,
+       
+      }
+    };
+    const result = await postCollection.updateOne(filter, Update);
+    res.send(result);
+});
 
   app.get('/allPost', async(req, res) => {
     const cursor = postCollection.find();
