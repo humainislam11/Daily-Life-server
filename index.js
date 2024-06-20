@@ -46,10 +46,65 @@ async function run() {
           res.status(500).send({ error: 'Failed to generate token' });
       }
   });
-  
 
-    app.get('/users', async(req,res)=>{
-      console.log(req.headers);
+
+  //middlewares
+
+  const verifyToken = (req, res, next) => {
+    console.log('inside verify token', req.headers.authorization);
+
+    // Check if authorization header is present
+    if (!req.headers.authorization) {
+        return res.status(401).send({ message: 'unauthorized access' });
+    }
+
+    // Split the Bearer token from the authorization header
+    const token = req.headers.authorization.split(' ')[1];
+
+    // Verify the token using the secret key
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(401).send({ message: 'unauthorized access' });
+        }
+
+        // Attach the decoded token to the request object
+        req.decoded = decoded;
+        next();
+    });
+};
+
+module.exports = verifyToken;
+
+  app.get('/users/admin/:email', verifyToken, async (req, res) => {
+    const email = req.params.email;
+
+    // Check if the email in the URL matches the email from the decoded token
+    if (email !== req.decoded.email) {
+        return res.status(403).send({ message: 'forbidden access' });
+    }
+
+    try {
+        // Query the user collection to find the user by email
+        const query = { email: email };
+        const user = await userCollection.findOne(query);
+
+        // Check if the user has the 'admin' role
+        let admin = false;
+        if (user && user.role === 'admin') {
+            admin = true;
+        }
+
+        // Send back the result
+        res.send({ admin });
+    } catch (err) {
+        console.error('Error fetching user from the database', err);
+        res.status(500).send({ message: 'Internal server error' });
+    }
+});
+
+
+    app.get('/users',verifyToken, async(req, res) =>{
+      
       const result = await userCollection.find().toArray();
       res.send(result);
 
