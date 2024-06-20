@@ -1,4 +1,5 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const cors = require('cors');
 require('dotenv').config();
 const app = express();
@@ -32,7 +33,23 @@ async function run() {
     const userCollection = client.db("assignment-12Db").collection('users');
     const postCollection = client.db("assignment-12Db").collection('post');
 
+
+    
+    app.post('/jwt', async (req, res) => {
+      const user = req.body;
+      try {
+          const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+              expiresIn: '1h'
+          });
+          res.send({ token });
+      } catch (err) {
+          res.status(500).send({ error: 'Failed to generate token' });
+      }
+  });
+  
+
     app.get('/users', async(req,res)=>{
+      console.log(req.headers);
       const result = await userCollection.find().toArray();
       res.send(result);
 
@@ -53,7 +70,7 @@ async function run() {
       const result = await postCollection.insertOne(newPost);
       res.send(result); 
   });
-  
+
   app.put('/allPost/:id', async (req, res) => {
     const id = req.params.id;
     const filter = { _id: new ObjectId(id) };
