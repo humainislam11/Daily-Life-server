@@ -75,6 +75,35 @@ async function run() {
 
 module.exports = verifyToken;
 
+
+
+
+const verifyAdmin = async (req, res, next) => {
+  try {
+    const email = req.decoded.email;
+    const query = { email: email };
+    
+    const user = await userCollection.findOne(query);
+    if (!user) {
+      return res.status(404).send({ message: 'User not found' });
+    }
+
+    const isAdmin = user.role === 'admin';
+    if (!isAdmin) {
+      return res.status(403).send({ message: 'Forbidden access' });
+    }
+
+    next();
+  } catch (error) {
+    return res.status(500).send({ message: 'Internal Server Error', error: error.message });
+  }
+};
+
+
+
+
+
+
   app.get('/users/admin/:email', verifyToken, async (req, res) => {
     const email = req.params.email;
 
@@ -103,7 +132,7 @@ module.exports = verifyToken;
 });
 
 
-    app.get('/users',verifyToken, async(req, res) =>{
+    app.get('/users',verifyToken, verifyAdmin, async(req, res) =>{
       
       const result = await userCollection.find().toArray();
       res.send(result);
@@ -120,34 +149,49 @@ module.exports = verifyToken;
         const result = await userCollection.insertOne(user);
         res.send(result)
     });
+
+    
     app.post('/post', async (req, res) => {
       const newPost = req.body;
       const result = await postCollection.insertOne(newPost);
       res.send(result); 
   });
 
+  
   app.put('/allPost/:id', async (req, res) => {
     const id = req.params.id;
     const filter = { _id: new ObjectId(id) };
-    const addComment = req.body;
-    const Update = {
-      $set: {
-        comment: addComment.comment,
-       
-      }
-    };
-    const result = await postCollection.updateOne(filter, Update);
-    res.send(result);
+    const newComment = req.body.comment;
+
+    // Find the post first to get the existing comments
+    const post = await postCollection.findOne(filter);
+
+    if (post) {
+        const updatedComments = post.comments || []; // If comments do not exist, initialize as an empty array
+        updatedComments.push(newComment);
+
+        const update = {
+            $set: {
+                comments: updatedComments
+            }
+        };
+
+        const result = await postCollection.updateOne(filter, update);
+        res.send(result);
+    } else {
+        res.status(404).send({ message: 'Post not found' });
+    }
 });
 
-app.delete('/users/:id', async (req,res)=>{
+
+app.delete('/users/:id',verifyToken,verifyAdmin, async (req,res)=>{
   const id = req.params.id;
   const query = { _id: new ObjectId(id)}
   const result = await userCollection.deleteOne(query);
   res.send(result);
 });
 
-app.patch('/users/admin/:id', async(req, res)=>{
+app.patch('/users/admin/:id',verifyToken,verifyAdmin, async(req, res)=>{
     const id = req.params.id;
     const filter = { _id: new ObjectId(id)};
     const updatedDoc = {
@@ -159,7 +203,19 @@ app.patch('/users/admin/:id', async(req, res)=>{
     res,send(result);
 });
 
+
+
+
+
+
   app.get('/allPost', async(req, res) => {
+    const filter = req.query;
+    console.log(filter);
+    const query = {
+      postTitle: {$regex: filter.search}
+    }
+
+
     const cursor = postCollection.find();
     const result = await cursor.toArray();
     res.send(result);
